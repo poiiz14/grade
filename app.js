@@ -11,6 +11,28 @@
         let englishExams = [];
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwluWii8MZauJnQaDz0VG79Tdax15sw9g2AXYQiUl_r2WzVpKc1sH19yeA03KurUNOe0w/exec';
 
+        // == FAST API helper ==
+        async function api(action, payload = {}) {
+          const url = SCRIPT_URL + '?action=' + encodeURIComponent(action);
+          const res = await fetch(url, {
+            method: 'GET', // ใช้ GET พารามฯ query บน GAS ง่ายสุด
+            headers: { 'Content-Type': 'application/json' },
+            // ถ้าต้องการ POST ก็แปลงได้ แต่ GET พอสำหรับอ่าน
+          });
+          // หมายเหตุ: ถ้าอยากส่ง payload แบบ query string ให้ต่อเป็น url + '&key=val...'
+          return res.json();
+        }
+
+        // == Pagination state สำหรับตาราง grades ฝั่ง Admin ==
+        const GRADES_PAGE = {
+          page: 1,
+          limit: 200,  // ดึงครั้งละ 200 แถว (ปรับได้)
+          total: 0,
+          studentId: 'all',
+          year: '',
+          term: '',
+        };
+
         // โหลด roles จาก GAS
         async function loadRolesFromSheet() {
           const res = await fetch(`${SCRIPT_URL}?action=fetchRoles`);
@@ -619,54 +641,67 @@
       }
 
         // Render grades table
-        function renderGradesTable(page = 1) {
-            const tbody = document.getElementById('gradesTableBody');
-            tbody.innerHTML = '';
+        async function renderGradesTable(page = 1) {
+        const tbody = document.getElementById('gradesTableBody');
+        tbody.innerHTML = '';
 
-            const itemsPerPage = 10;
-            const start = (page - 1) * itemsPerPage;
-            const end = start + itemsPerPage;
+        GRADES_PAGE.page = page;
 
-            const selectedStudentId = document.getElementById('studentFilter')?.value || 'all';
-            const dataToUse = Array.isArray(grades) ? grades : [];
+        // รับค่าจาก dropdown filter ถ้ามี
+        const selectedStudentId = document.getElementById('studentFilter')?.value || 'all';
+        GRADES_PAGE.studentId = selectedStudentId || 'all';
 
-            const filtered = selectedStudentId === 'all'
-              ? dataToUse
-              : dataToUse.filter(g => g.studentId === selectedStudentId);
+        // สร้าง query string
+        const q = new URLSearchParams({
+          action: 'fetchGradesPage',
+          offset: String((GRADES_PAGE.page - 1) * GRADES_PAGE.limit),
+          limit: String(GRADES_PAGE.limit),
+          fields: 'studentId,year,term,courseId,courseName,credit,grade',
+        });
 
-            const pageGrades = filtered.slice(start, end);
+        if (GRADES_PAGE.studentId !== 'all') q.set('studentId', GRADES_PAGE.studentId);
+        if (GRADES_PAGE.year) q.set('year', GRADES_PAGE.year);
+        if (GRADES_PAGE.term) q.set('term', GRADES_PAGE.term);
 
-            if (pageGrades.length === 0) {
-              tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-gray-500">ไม่มีข้อมูลผลการเรียน</td></tr>`;
-              return;
-            }
+        const res = await fetch(`${SCRIPT_URL}?${q.toString()}`);
+        const data = await res.json();
 
-            pageGrades.forEach((grade, index) => {
-              const tr = document.createElement('tr');
-              tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+        if (!data.ok) {
+          tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-gray-500">${data.error || 'โหลดข้อมูลไม่สำเร็จ'}</td></tr>`;
+          return;
+        }
 
-              const studentName = getStudentName(grade.studentId) || '-';
+        GRADES_PAGE.total = data.total || 0;
 
-              tr.innerHTML = `
-                <td class="text-center">${grade.studentId}</td>
-                <td>${studentName}</td>
-                <td class="text-center">${grade.year}</td>
-                <td class="text-center">${grade.term}</td>
-                <td class="text-center">${grade.courseId}</td>
-                <td>${grade.courseName}</td>
-                <td class="text-center">${grade.credit}</td>
-                <td class="text-center">${grade.grade}</td>
-                <td class="text-center">
-                  <button class="text-blue-500 hover:underline" onclick="openEditGradeModal('${grade.studentId}', '${grade.courseId}', '${grade.year}', '${grade.term}')">🖊️</button>
-                  <button class="text-red-500 hover:underline" onclick="deleteGrade('${grade.studentId}', '${grade.courseId}', '${grade.year}', '${grade.term}')">🗑️</button>
-                </td>
-              `;
-              tbody.appendChild(tr);
-            });
+        const pageGrades = Array.isArray(data.data) ? data.data : [];
+        if (pageGrades.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-gray-500">ไม่มีข้อมูลผลการเรียน</td></tr>`;
+          renderPagination('gradesPagination', 1, 1, renderGradesTable);
+          return;
+        }
 
-            const totalPages = Math.ceil(filtered.length / itemsPerPage);
-            renderPagination('gradesPagination', totalPages, page, renderGradesTable);
-          }
+        pageGrades.forEach((grade, index) => {
+          const tr = document.createElement('tr');
+          tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+          const studentName = getStudentName(grade.studentId) || '-';
+          tr.innerHTML = `
+            <td class="text-center">${grade.studentId}</td>
+            <td>${studentName}</td>
+            <td class="text-center">${grade.year}</td>
+            <td class="text-center">${grade.term}</td>
+            <td class="text-center">${grade.courseId}</td>
+            <td>${grade.courseName}</td>
+            <td class="text-center">${grade.credit}</td>
+            <td class="text-center">${grade.grade}</td>
+            <td class="text-center">—</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const totalPages = Math.max(1, Math.ceil(GRADES_PAGE.total / GRADES_PAGE.limit));
+        renderPagination('gradesPagination', totalPages, GRADES_PAGE.page, renderGradesTable);
+      }
+
 
       function getStudentName(studentId) {
         const student = students.find(s => s.id === studentId);
