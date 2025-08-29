@@ -3,7 +3,7 @@
    ================================ */
 
 // ===== ตั้งค่า URL ของ Web App (ใส่ของปอย) =====
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyUu2Ut-oWstUA61UcfrNE52PRgn4lKeRezjH5opOb9ujh3k5XY11CZgXZQyhi_krbixA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwluWii8MZauJnQaDz0VG79Tdax15sw9g2AXYQiUl_r2WzVpKc1sH19yeA03KurUNOe0w/exec';
 
 // ===== JSONP helper (กัน CORS) =====
 function jsonp(url, timeout = 8000) {
