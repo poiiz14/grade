@@ -4,9 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ระบบรายงานผลการเรียนนักศึกษา — Fast</title>
-  <!-- Tailwind via CDN (สำหรับ GitHub Pages ใช้ง่ายสุด) -->
+  <!-- Tailwind via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="styles.css">
+  <!-- เพิ่ม SweetAlert2 แก้ Swal is not defined -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <header class="max-w-6xl mx-auto py-6">
@@ -77,6 +79,7 @@
     </section>
   </main>
 
+  <!-- โหลด JS ตอนท้ายเพื่อความเร็ว -->
   <script src="app.js"></script>
 </body>
 </html>
